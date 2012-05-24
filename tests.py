@@ -28,17 +28,14 @@ class NumberTests(unittest.TestCase):
     self.assertTrue(answer.match("1/2"))
     self.assertTrue(answer.match("1"))
 
-    answer.set_range_mode("inclusive_low")
-    self.assertTrue(answer.match("0.5"))
-    self.assertFalse(answer.match("1"))
+    self.assertTrue(answer.match("0.5", rangemode="inclusive_low"))
+    self.assertFalse(answer.match("1", rangemode="inclusive_low"))
 
-    answer.set_range_mode("inclusive_high")
-    self.assertTrue(answer.match("1"))
-    self.assertFalse(answer.match("0.5"))
+    self.assertTrue(answer.match("1", rangemode="inclusive_high"))
+    self.assertFalse(answer.match("0.5", rangemode="inclusive_high"))
 
-    answer.set_range_mode("exclusive")
-    self.assertFalse(answer.match("0.5"))
-    self.assertFalse(answer.match("1"))
+    self.assertFalse(answer.match("0.5", rangemode="exclusive"))
+    self.assertFalse(answer.match("1", rangemode="exclusive"))
 
 class StringTests(unittest.TestCase):
   def test_lower(self):

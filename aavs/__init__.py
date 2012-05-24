@@ -22,7 +22,7 @@ class Number(Answer):
     "inclusive_high" : lambda low, v, high: low < v <= high
   }
 
-  def __init__(self, low, high=None, match_mode="roundoff", range_mode="inclusive"):
+  def __init__(self, low, high=None, match_mode="roundoff"):
     if high is None:
       self.answermode = Number.EXACT
       self.answer = self._interpret_input(low)
@@ -31,12 +31,7 @@ class Number(Answer):
       self.low = self._interpret_input(low)
       self.high = self._interpret_input(high)
 
-    self.set_range_mode(range_mode)
     self.set_match_mode(match_mode)
-
-  def set_range_mode(self, range_mode):
-    self.range_checker = self.__class__.range_checker[range_mode]
-    return self
 
   fraction_regex = re.compile("(\d+)/(\d+)", flags=re.U)
   def _interpret_input(self, answer, **kwargs):
@@ -57,7 +52,8 @@ class Number(Answer):
     if self.answermode == Number.RANGE:
       low = round(self.low, digits)
       high = round(self.high, digits)
-      return self.range_checker(low, answer, high)
+      range_checker = self.range_checker.get(kwargs.get("rangemode", "inclusive"))
+      return range_checker(low, answer, high)
     else:
       return str(answer) == str(round(self.answer, digits)) # CODE-REVIEW: Enough? Too much? For ensuring float == float
 
