@@ -5,7 +5,7 @@ from decimal import Decimal, getcontext
 # convention for match_methods is that the default method is on the 0 slot
 
 class Answer(object):
-  def set_match_mode(self, default):
+  def set_match_mode(self, match_mode):
     self.match = getattr(self, "match_" + match_mode, getattr(self, "match_" + self.__class__.match_methods[0]))
     return self
 
@@ -25,7 +25,7 @@ class Number(Answer):
   def __init__(self, low, high=None, match_mode="roundoff", range_mode="inclusive"):
     if high is None:
       self.answermode = Number.EXACT
-      self.answer = self._interpret_input(lowrange)
+      self.answer = self._interpret_input(low)
     else:
       self.answermode = Number.RANGE
       self.low = self._interpret_input(low)
@@ -45,6 +45,8 @@ class Number(Answer):
       answer = Decimal(answer)
     else:
       top, bottom = m.groups()
+      if bottom == "0":
+        return Decimal("NaN")
       answer = Decimal(top) / Decimal(bottom)
 
     return answer
@@ -65,23 +67,42 @@ class Number(Answer):
 class String(Answer):
   """String answers. Will always strip whitespace."""
 
-  match_methods = ("lower", "exact", "regex")
+  match_methods = ("ignorecase", "exact", "pattern", "regex")
 
-  def __init__(self, answer, match_mode="lower"):
+  def __init__(self, answer, match_mode="ignorecase"):
     self.set_match_mode(match_mode)
     self.answer = answer.strip()
 
-  def match_lower(self, answer, **kwargs):
+  def match_ignorecase(self, answer, **kwargs):
     return answer.strip().lower() == self.answer.lower()
 
   def match_exact(self, answer, **kwargs):
     return answer.strip() == self.answer
 
+  def match_pattern(self, answer, **kwargs):
+    temp = self.answer.strip().replace(".", r"\.") # CODE-REVIEW: Again. Auto compilation at init.
+    pattern = "^"
+    for i, c in enumerate(temp):
+      if c == "*" and temp[i-1] != "\\":
+        c = ".+"
+
+      pattern += c
+
+    pattern += "$"
+
+    if kwargs.get("ignorecase", True):
+      return re.match(pattern, answer.strip(), flags=re.I) is not None
+    else:
+      return re.match(pattern, answer.strip()) is not None
+
   def match_regex(self, answer, **kwargs):
-    return re.match(self.answer, answer.strip()) is not None # CODE-REVIEW: Should we somehow compile this before hand for speed up?
+    if kwargs.get("ignorecase", True):
+      return re.match(self.answer, answer.strip(), flags=re.I) is not None # CODE-REVIEW: Should we somehow compile this before hand for speed up?
+    else:
+      return re.match(self.answer, answer.strip()) is not None
 
 class MultipleGuess(Answer):
-  match_method = ("exact", "multiple_exact", "include", "exclude")
+  match_methods = ("exact", "multiple_exact", "include", "exclude")
 
   def __init__(self, answer, match_mode="exact"):
     self.answer = answer
@@ -118,32 +139,85 @@ class MultipleGuess(Answer):
       else:
         for a in answer:
           if a in self.answer:
-            return True
-        return False
+            return False
+        return True
 
 class ListOfAnswers(Answer):
-  match_method = ("exact", "exact_unordered", "include", "exclude")
+  match_methods = ("exact", "exact_unordered", "include", "exclude")
 
   def __init__(self, answer, match_mode="exact"):
-    """Initializes a new list of answers
-
-    Args:
-      """
     self.answer = answer
     self.set_match_mode(match_mode)
 
   def match_exact(self, answer, **kwargs):
-    pass
+    if len(answer) != len(self.answer):
+      return False
+
+    for i, a in enumerate(answer):
+      if not self.answer[i].match(a):
+        return False
+
+    return True
 
   def match_exact_unordered(self, answer, **kwargs):
-    pass
+    # CODE-REVIEW: Faster method. Current is O(n^2)
+    # Does it really matter though? It's not like there are gonna be 100k answers.
+    # This maybe improved if the self.answer is somehow used.
+    # INVESTIGATE: any(f(v) for v in values for f in functions)?
+
+    if len(answer) != len(self.answer):
+      return False
+
+    return all(any(j.match(a) for j in self.answer) for a in answer)
 
   def match_include(self, answer, **kwargs):
-    pass
+    # INVESTIGATE: match_exclude style optimization
+    n = 0
+    minimum = kwargs.get("minimum", len(answer))
+    for a in answer:
+      found = False
+      for j in self.answer:
+        if j.match(a):
+          n += 1
+          found = True
+          break
+
+      if not found:
+        return False
+
+    if n >= minimum:
+      return True
+    return False
 
   def match_exclude(self, answer, **kwargs):
-    pass
+    n = 0
+    minimum = kwargs.get("minimum", len(answer))
 
+    for a in answer:
+      for j in self.answer:
+        if j.match(a):
+          return False
+      n += 1
+    if n >= minimum:
+      return True
+    return False
 
 class MapOfAnswers(Answer):
-  pass
+  match_methods = ("exact", )
+
+  def __init__(self, answer, match_mode="exact"):
+    self.answer = answer
+    self.set_match_mode(match_mode)
+
+  def match_exact(self, answer, **kwargs):
+    if len(answer) != len(self.answer):
+      return False
+
+    for k, v in answer.iteritems():
+      a = self.answer.get(k, None)
+      if a is None:
+        return False
+      if not a.match(v):
+        return False
+
+    return True

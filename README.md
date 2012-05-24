@@ -5,6 +5,8 @@ AAVS
 verifies homework question answers automatically everytime an answer is submitted
 for grading.
 
+One interface to rule them all!
+
 Teachers are allowed to choose in the web interface what type of answers and
 what kind of validatons is for each question.
 
@@ -21,3 +23,4 @@ Planned support:
 
  - Code
  - Code verification of the answers for any type.
+
