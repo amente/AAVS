@@ -1,6 +1,6 @@
 import re
 import math
-from decimal import Decimal, getcontext
+from decimal import Decimal
 
 # convention for match_methods is that the default method is on the 0 slot
 
