@@ -22,14 +22,14 @@ class Number(Answer):
     "inclusive_high" : lambda low, v, high: low < v <= high
   }
 
-  def __init__(self, low, high=None, match_mode="roundoff"):
-    if high is None:
+  def __init__(self, answer, match_mode="default"):
+    if isinstance(answer, str):
       self.answermode = Number.EXACT
-      self.answer = self._interpret_input(low)
+      self.answer = self._interpret_input(answer)
     else:
       self.answermode = Number.RANGE
-      self.low = self._interpret_input(low)
-      self.high = self._interpret_input(high)
+      self.low = self._interpret_input(answer[0])
+      self.high = self._interpret_input(answer[1])
 
     self.set_match_mode(match_mode)
 
@@ -65,7 +65,7 @@ class String(Answer):
 
   match_methods = ("ignorecase", "exact", "pattern", "regex")
 
-  def __init__(self, answer, match_mode="ignorecase"):
+  def __init__(self, answer, match_mode="default"):
     self.set_match_mode(match_mode)
     self.answer = answer.strip()
 
@@ -100,7 +100,7 @@ class String(Answer):
 class MultipleGuess(Answer):
   match_methods = ("exact", "multiple_exact", "include", "exclude")
 
-  def __init__(self, answer, match_mode="exact"):
+  def __init__(self, answer, match_mode="default"):
     self.answer = answer
     self.set_match_mode(match_mode)
 
@@ -141,7 +141,14 @@ class MultipleGuess(Answer):
 class ListOfAnswers(Answer):
   match_methods = ("exact", "exact_unordered", "include", "exclude")
 
-  def __init__(self, answer, match_mode="exact"):
+  def __init__(self, answer, match_mode="default"):
+    if len(answer) > 0:
+      if isinstance(answer[0], (tuple, list)):
+        temp = []
+        for clsname, answer, match_mode in answer:
+          temp.append(globals()[clsname](answer, match_mode))
+        answer = temp # CODE-REVIEW: Make this simpler. To be compatible
+
     self.answer = answer
     self.set_match_mode(match_mode)
 
@@ -201,7 +208,14 @@ class ListOfAnswers(Answer):
 class MapOfAnswers(Answer):
   match_methods = ("exact", )
 
-  def __init__(self, answer, match_mode="exact"):
+  def __init__(self, answer, match_mode="default"):
+    if len(answer) > 0:
+      if isinstance(answer.values()[0], (tuple, list)):
+        temp = {}
+        for key, v in answer.iteritems():
+          clsname, a, match_mode = v
+          temp[key] = globals()[clsname](a, match_mode)
+        answer = temp
     self.answer = answer
     self.set_match_mode(match_mode)
 

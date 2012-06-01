@@ -20,7 +20,7 @@ class NumberTests(unittest.TestCase):
     self.assertFalse(answer.match("0/0")) # 0/0 is NaN
     self.assertTrue(answer.match("0.000000000001")) # unfortunately, due to rounding.
 
-    answer = Number("1/2", "1")
+    answer = Number(("1/2", "1"))
     self.assertTrue(answer.match("0.7"))
     self.assertFalse(answer.match("0.3"))
     self.assertFalse(answer.match("1.3"))
@@ -94,9 +94,7 @@ class MultipleGuessTest(unittest.TestCase):
 
 class ListOfAnswersTest(unittest.TestCase):
   def test_exact(self):
-    answer1 = Number("1/2")
-    answer2 = String("km")
-    answer = ListOfAnswers([answer1, answer2])
+    answer = ListOfAnswers([("Number", "1/2", "default"), ("String", "km", "default")])
 
     self.assertTrue(answer.match(["0.5", "KM"]))
     self.assertTrue(answer.match(["1/2", "Km "]))
@@ -144,10 +142,7 @@ class ListOfAnswersTest(unittest.TestCase):
 
 class MapOfAnswersTest(unittest.TestCase):
   def test_exact(self):
-
-    answer1 = Number("2/3")
-    answer2 = Number("1/3")
-    answer = MapOfAnswers({"a" : answer1, "b" : answer2})
+    answer = MapOfAnswers({"a" : ("Number", "2/3", "default"), "b" : ("Number", "1/3", "default")})
 
     self.assertTrue(answer.match({"a" : "2/3", "b" : "0.33333"}))
     self.assertFalse(answer.match({"a" : "2/3"}))
