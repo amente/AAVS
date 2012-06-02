@@ -145,8 +145,8 @@ class ListOfAnswers(Answer):
     if len(answer) > 0:
       if isinstance(answer[0], (tuple, list)):
         temp = []
-        for clsname, answer, match_mode in answer:
-          temp.append(globals()[clsname](answer, match_mode))
+        for clsname, a, match_mode in answer:
+          temp.append(globals()[clsname](a, match_mode))
         answer = temp # CODE-REVIEW: Make this simpler. To be compatible
 
     self.answer = answer
