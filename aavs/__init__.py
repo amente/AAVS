@@ -23,7 +23,7 @@ class Number(Answer):
   }
 
   def __init__(self, answer, match_mode="default"):
-    if isinstance(answer, str):
+    if isinstance(answer, basestring):
       self.answermode = Number.EXACT
       self.answer = self._interpret_input(answer)
     else:
