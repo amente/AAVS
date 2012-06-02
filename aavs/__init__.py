@@ -33,7 +33,7 @@ class Number(Answer):
 
     self.set_match_mode(match_mode)
 
-  fraction_regex = re.compile("(\d+)/(\d+)", flags=re.U)
+  fraction_regex = re.compile("(-?\d+)/(\d+)", flags=re.U)
   def _interpret_input(self, answer, **kwargs):
     m = Number.fraction_regex.match(answer)
     if m is None:
