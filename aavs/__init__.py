@@ -9,6 +9,11 @@ class Answer(object):
     self.match = getattr(self, "match_" + match_mode, getattr(self, "match_" + self.__class__.match_methods[0]))
     return self
 
+  def set_options(self, **options):
+    originals = getattr(self, "options", {})
+    originals.update(options)
+    self.options = originals
+
 class Number(Answer):
   EXACT = 0
   RANGE = 1
@@ -22,40 +27,52 @@ class Number(Answer):
     "inclusive_high" : lambda low, v, high: low < v <= high
   }
 
-  def __init__(self, answer, match_mode="default"):
-    if isinstance(answer, basestring):
-      self.answermode = Number.EXACT
-      self.answer = self._interpret_input(answer)
-    else:
-      self.answermode = Number.RANGE
-      self.low = self._interpret_input(answer[0])
-      self.high = self._interpret_input(answer[1])
+  def set_options(self, **options):
+    Answer.set_options(self, **options)
+    if "digits" in options:
+      if isinstance(self.original, basestring):
+        self.answermode = Number.EXACT
+        self.answer = self._interpret_input(self.original)
+      else:
+        self.answermode = Number.RANGE
+        self.low = self._interpret_input(self.original[0])
+        self.high = self._interpret_input(self.original[1])
 
+  def __init__(self, answer, match_mode="default", **kwargs):
+    self.original = answer
     self.set_match_mode(match_mode)
+    kwargs.setdefault("digits", 2)
+    self.set_options(**kwargs)
 
-  fraction_regex = re.compile("(-?\d+)/(\d+)", flags=re.U)
-  def _interpret_input(self, answer, **kwargs):
+  fraction_regex = re.compile(r"(-?\d+)/(\d+)", flags=re.U)
+  scinote_regex = re.compile(r"([0-9.]+)e([+\-]?\d+)", flags=re.U)
+
+  def _interpret_input(self, answer):
+    roundoff = self.options.get("digits", 2)
+
     m = Number.fraction_regex.match(answer)
     if m is None:
-      answer = Decimal(answer)
+      m = Number.scinote_regex.match(answer)
+      if m is None:
+        answer = round(Decimal(answer), roundoff)
+      else:
+        base, exp = m.groups()
+        base = round(Decimal(base), 2)
+        answer = float(str(base) + "e" + str(exp))
     else:
       top, bottom = m.groups()
       if bottom == "0":
         return Decimal("NaN")
-      answer = Decimal(top) / Decimal(bottom)
+      answer = round(Decimal(top) / Decimal(bottom), roundoff)
 
     return answer
 
-  def match_roundoff(self, answer, **kwargs):
-    digits = kwargs.get("digits", 2)
-    answer = round(self._interpret_input(answer), digits)
+  def match_roundoff(self, answer):
     if self.answermode == Number.RANGE:
-      low = round(self.low, digits)
-      high = round(self.high, digits)
-      range_checker = self.range_checker.get(kwargs.get("rangemode", "inclusive"))
-      return range_checker(low, answer, high)
+      range_checker = self.range_checker.get(self.options.get("rangemode", "inclusive"))
+      return range_checker(self.low, self._interpret_input(answer), self.high)
     else:
-      return str(answer) == str(round(self.answer, digits)) # CODE-REVIEW: Enough? Too much? For ensuring float == float
+      return str(self._interpret_input(answer)) == str(self.answer)
 
   def match_sigfig(self, answer):
     raise NotImplementedError # TODO: Implement this
@@ -65,34 +82,42 @@ class String(Answer):
 
   match_methods = ("ignorecase", "exact", "pattern", "regex")
 
-  def __init__(self, answer, match_mode="default"):
-    self.set_match_mode(match_mode)
-    self.answer = answer.strip()
+  def set_match_mode(self, match_mode):
+    Answer.set_match_mode(self, match_mode)
+    if self.match == self.match_pattern:
+      temp = self.original.replace(".", r"\,")
+      pattern = "^"
+      for i, c in enumerate(temp):
+        if c == "*" and temp[i-1] != "\\":
+          if temp[i-1] == "\\":
+            pattern = pattern[:-1]
+          else:
+            c = ".+"
+        pattern += c
+      pattern += "$"
+      self.answer = pattern
+    else:
+      self.answer = self.original
 
-  def match_ignorecase(self, answer, **kwargs):
+  def __init__(self, answer, match_mode="default", **kwargs):
+    self.original = answer.strip()
+    self.set_match_mode(match_mode) # sets self.answer
+    self.options = kwargs
+
+  def match_ignorecase(self, answer):
     return answer.strip().lower() == self.answer.lower()
 
-  def match_exact(self, answer, **kwargs):
+  def match_exact(self, answer):
     return answer.strip() == self.answer
 
-  def match_pattern(self, answer, **kwargs):
-    temp = self.answer.strip().replace(".", r"\.") # CODE-REVIEW: Again. Auto compilation at init.
-    pattern = "^"
-    for i, c in enumerate(temp):
-      if c == "*" and temp[i-1] != "\\":
-        c = ".+"
-
-      pattern += c
-
-    pattern += "$"
-
-    if kwargs.get("ignorecase", True):
-      return re.match(pattern, answer.strip(), flags=re.I) is not None
+  def match_pattern(self, answer):
+    if self.options.get("ignorecase", True):
+      return re.match(self.answer, answer.strip(), flags=re.I) is not None
     else:
-      return re.match(pattern, answer.strip()) is not None
+      return re.match(self.answer, answer.strip()) is not None
 
-  def match_regex(self, answer, **kwargs):
-    if kwargs.get("ignorecase", True):
+  def match_regex(self, answer):
+    if self.options.get("ignorecase", True):
       return re.match(self.answer, answer.strip(), flags=re.I) is not None # CODE-REVIEW: Should we somehow compile this before hand for speed up?
     else:
       return re.match(self.answer, answer.strip()) is not None
@@ -100,19 +125,27 @@ class String(Answer):
 class MultipleGuess(Answer):
   match_methods = ("exact", "multiple_exact", "include", "exclude")
 
-  def __init__(self, answer, match_mode="default"):
-    self.answer = answer
-    self.set_match_mode(match_mode)
+  def set_match_mode(self, match_mode):
+    Answer.set_match_mode(self, match_mode)
+    if self.match == self.match_exact:
+      self.answer = self.original
+    else:
+      self.answer = set(self.original)
 
-  def match_exact(self, answer, **kwargs):
+  def __init__(self, answer, match_mode="default", **kwargs):
+    self.original = answer
+    self.set_match_mode(match_mode)
+    self.options = kwargs
+
+  def match_exact(self, answer):
     return answer == self.answer
 
-  def match_multiple_exact(self, answer, **kwargs):
-    return set(answer) == set(self.answer)
+  def match_multiple_exact(self, answer):
+    return set(answer) == self.answer
 
-  def match_include(self, answer, **kwargs):
+  def match_include(self, answer):
     if isinstance(answer, basestring):
-      return answer in self.answer # CODE-REVIEW: Again, should this be a set to start with, or a dict? Reason: Speed.
+      return answer in self.answer
     else:
       try:
         iter(answer)
@@ -124,7 +157,7 @@ class MultipleGuess(Answer):
             return False
         return True
 
-  def match_exclude(self, answer, **kwargs):
+  def match_exclude(self, answer):
     if isinstance(answer, basestring):
       return answer not in self.answer
     else:
@@ -141,18 +174,19 @@ class MultipleGuess(Answer):
 class ListOfAnswers(Answer):
   match_methods = ("exact", "exact_unordered", "include", "exclude")
 
-  def __init__(self, answer, match_mode="default"):
+  def __init__(self, answer, match_mode="default", **kwargs):
     if len(answer) > 0:
       if isinstance(answer[0], (tuple, list)):
         temp = []
-        for clsname, a, match_mode in answer:
-          temp.append(globals()[clsname](a, match_mode))
+        for clsname, a, mm, options in answer:
+          temp.append(globals()[clsname](a, mm, **options))
         answer = temp # CODE-REVIEW: Make this simpler. To be compatible
 
     self.answer = answer
     self.set_match_mode(match_mode)
+    self.options = kwargs
 
-  def match_exact(self, answer, **kwargs):
+  def match_exact(self, answer):
     if len(answer) != len(self.answer):
       return False
 
@@ -162,21 +196,18 @@ class ListOfAnswers(Answer):
 
     return True
 
-  def match_exact_unordered(self, answer, **kwargs):
-    # CODE-REVIEW: Faster method. Current is O(n^2)
-    # Does it really matter though? It's not like there are gonna be 100k answers.
-    # This maybe improved if the self.answer is somehow used.
-    # INVESTIGATE: any(f(v) for v in values for f in functions)?
-
+  def match_exact_unordered(self, answer):
     if len(answer) != len(self.answer):
       return False
 
     return all(any(j.match(a) for j in self.answer) for a in answer)
 
-  def match_include(self, answer, **kwargs):
-    # INVESTIGATE: match_exclude style optimization
+  def match_include(self, answer):
+    # CODE-REVIEW: match_exclude style code?
     n = 0
-    minimum = kwargs.get("minimum", len(answer))
+    minimum = self.options.get("minimum")
+    if minimum is None:
+      minimum = len(answer) # since set_options cannot delete.
     for a in answer:
       found = False
       for j in self.answer:
@@ -192,10 +223,11 @@ class ListOfAnswers(Answer):
       return True
     return False
 
-  def match_exclude(self, answer, **kwargs):
+  def match_exclude(self, answer):
     n = 0
-    minimum = kwargs.get("minimum", len(answer))
-
+    minimum = self.options.get("minimum")
+    if minimum is None:
+      minimum = len(answer) # since set_options cannot delete.
     for a in answer:
       for j in self.answer:
         if j.match(a):
@@ -208,18 +240,19 @@ class ListOfAnswers(Answer):
 class MapOfAnswers(Answer):
   match_methods = ("exact", )
 
-  def __init__(self, answer, match_mode="default"):
+  def __init__(self, answer, match_mode="default", **kwargs):
     if len(answer) > 0:
       if isinstance(answer.values()[0], (tuple, list)):
         temp = {}
         for key, v in answer.iteritems():
-          clsname, a, match_mode = v
-          temp[key] = globals()[clsname](a, match_mode)
+          clsname, a, mm, options = v
+          temp[key] = globals()[clsname](a, mm, **options)
         answer = temp
     self.answer = answer
     self.set_match_mode(match_mode)
+    self.options = kwargs
 
-  def match_exact(self, answer, **kwargs):
+  def match_exact(self, answer):
     if len(answer) != len(self.answer):
       return False
 
