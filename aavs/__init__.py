@@ -1,5 +1,4 @@
 import re
-import math
 from decimal import Decimal
 
 # convention for match_methods is that the default method is on the 0 slot
@@ -13,6 +12,7 @@ class Answer(object):
     originals = getattr(self, "options", {})
     originals.update(options)
     self.options = originals
+
 
 class Number(Answer):
   EXACT = 0
@@ -123,7 +123,7 @@ class String(Answer):
       return re.match(self.answer, answer.strip()) is not None
 
 class MultipleGuess(Answer):
-  match_methods = ("exact", "multiple_exact", "include", "exclude")
+  match_methods = ("exact", "exact_multiple", "include", "exclude")
 
   def set_match_mode(self, match_mode):
     Answer.set_match_mode(self, match_mode)
