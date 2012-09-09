@@ -113,11 +113,7 @@ class String(Answer):
     else:
       return re.match(self.answer, answer.strip()) is not None
 
-  def match_regex(self, answer):
-    if self.options.get("ignorecase", True):
-      return re.match(self.answer, answer.strip(), flags=re.I) is not None # CODE-REVIEW: Should we somehow compile this before hand for speed up?
-    else:
-      return re.match(self.answer, answer.strip()) is not None
+  match_regex = match_pattern
 
 class MultipleGuess(Answer):
   match_methods = ("exact", "exact_multiple", "include", "exclude")
