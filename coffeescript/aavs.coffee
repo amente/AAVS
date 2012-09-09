@@ -62,8 +62,8 @@ class ANumber extends Answer
         answer = math.roundToDecimalPlace(parseFloat(answer), roundoff)
       else
         m = @scinote_regex.exec(answer)
-        base = m[1]
-        exponent = m[2]
+        base = math.roundToDecimalPlace(parseFloat(m[1]), roundoff)
+        exponent = parseFloat(m[2])
 
         if base == null or exponent == null
           return NaN
