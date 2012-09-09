@@ -1,7 +1,7 @@
 exports = namespace "aavs"
 math = require "math"
 # delete above lines if just plugging this file in.
-# This is used with coffeecrispt in a namespace or whatever.
+# This is used with coffeecrispt
 
 # If compiled not with math.coffee, use this function:
 # math.roundToDecimalPlace = (v, decimalPlace) ->
@@ -90,5 +90,42 @@ class ANumber extends Answer
 
   match_sigfig: (answer) -> throw "NOT IMPLEMENTED!"
 
+class AString extends Answer
+  match_methods: ["ignorecase", "exact", "pattern", "regex"]
+
+  set_match_mode: (match_mode) ->
+    super(match_mode)
+    if @match == @match_pattern
+      temp = @original.replace(".", "\\.")
+      pattern = "^"
+      for c, i in temp
+        if c == "*" and temp[i-1] != "\\"
+          c = ".+"
+
+        pattern += c
+      pattern += "$"
+      @answer = pattern
+    else
+      @answer = @original
+
+  constructor: (answer, match_mode="default", options={}) ->
+    @original = $.trim(answer)
+    @set_match_mode(match_mode)
+    @options = options
+
+  match_ignorecase: (answer) -> $.trim(answer).toLowerCase() == @answer.toLowerCase()
+
+  match_exact: (answer) -> $.trim(answer) == @answer
+
+  # TODO: add ignorecase options to answer args in edit ui
+  match_pattern: (answer) ->
+    if @options["ignorecase"] in [true, undefined]
+      new RegExp(@answer, "i").test(answer)
+    else
+      new RegExp(@answer).test(answer)
+
+  match_regex: @prototype.match_pattern
+
 exports["Answer"] = Answer
 exports["ANumber"] = ANumber
+exports["AString"] = AString
