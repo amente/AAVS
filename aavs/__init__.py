@@ -85,14 +85,11 @@ class String(Answer):
   def set_match_mode(self, match_mode):
     Answer.set_match_mode(self, match_mode)
     if self.match == self.match_pattern:
-      temp = self.original.replace(".", r"\,")
+      temp = self.original.replace(".", r"\.")
       pattern = "^"
       for i, c in enumerate(temp):
         if c == "*" and temp[i-1] != "\\":
-          if temp[i-1] == "\\":
-            pattern = pattern[:-1]
-          else:
-            c = ".+"
+          c = ".+"
         pattern += c
       pattern += "$"
       self.answer = pattern

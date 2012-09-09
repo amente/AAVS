@@ -89,6 +89,10 @@ class StringTests(unittest.TestCase):
     self.assertTrue(answer.match("test*"))
     self.assertFalse(answer.match("testadf"))
 
+    answer = String("test.", match_mode="pattern")
+    self.assertTrue(answer.match("test."))
+    self.assertFalse(answer.match("test"))
+
   def test_regex(self):
     answer = String("^t[e|a]st$", match_mode="regex")
     self.assertTrue(answer.match("test"))
