@@ -1,14 +1,52 @@
-exports = namespace "aavs"
-math = require "math"
-# delete above lines if just plugging this file in.
-# This is used with coffeecrispt
+# Copyright 2012 Project K3
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Authors:
+#   Shuhao Wu <shuhao@projectk3.com>
 
-# If compiled not with math.coffee, use this function:
-# math.roundToDecimalPlace = (v, decimalPlace) ->
-#   p = Math.pow(10, decimalPlace)
-#   Math.round(v * p) / p
+# Required functions/classes
+roundToDecimalPlace = (v, decimalPlace) ->
+  p = Math.pow(10, decimalPlace)
+  Math.round(v * p) / p
+
+class Set
+  constructor: (l) ->
+    @_data = {}
+
+    if l
+      ltype = $.type(l)
+      if ltype == "array"
+        for element in l
+          @_data[element] = true
+
+      else if ltype == "object"
+        for key of l
+          @_data[key] = true
 
 
+  equals: (other) ->
+    if other instanceof Set
+      for key of other._data
+        if key not of @_data
+          return false
+      true
+    else
+      @equals(new Set(other))
+
+  has: (value) -> value of @_data
+
+# Actual code for AAVS
 class Answer
   set_match_mode: (match_mode) ->
     @match = this["match_" + match_mode] or this["match_" + @match_methods[0]]
@@ -25,7 +63,7 @@ class ANumber extends Answer
   EXACT: 0
   RANGE: 1
 
-  match_methods: ["roundoff", "sigfig"] # sigfig not available.
+  match_methods: ["roundoff", "sigfig"] # TODO: sigfig not available
 
   range_checker: {
     inclusive: ((low, v, high) -> low <= v <= high),
@@ -59,10 +97,10 @@ class ANumber extends Answer
     roundoff = @options["digits"] or 2
     if not @fraction_regex.test(answer)
       if not @scinote_regex.test(answer)
-        answer = math.roundToDecimalPlace(parseFloat(answer), roundoff)
+        answer = roundToDecimalPlace(parseFloat(answer), roundoff)
       else
         m = @scinote_regex.exec(answer)
-        base = math.roundToDecimalPlace(parseFloat(m[1]), roundoff)
+        base = roundToDecimalPlace(parseFloat(m[1]), roundoff)
         exponent = parseFloat(m[2])
 
         if base == null or exponent == null
@@ -76,7 +114,7 @@ class ANumber extends Answer
       if top == null or bottom == null or bottom == 0
         return NaN
 
-      answer = math.roundToDecimalPlace(top / bottom, roundoff)
+      answer = roundToDecimalPlace(top / bottom, roundoff)
 
     answer
 
@@ -117,7 +155,6 @@ class AString extends Answer
 
   match_exact: (answer) -> $.trim(answer) == @answer
 
-  # TODO: add ignorecase options to answer args in edit ui
   match_pattern: (answer) ->
     if @options["ignorecase"] in [true, undefined]
       new RegExp(@answer, "i").test(answer)
@@ -126,6 +163,37 @@ class AString extends Answer
 
   match_regex: @prototype.match_pattern
 
-exports["Answer"] = Answer
-exports["ANumber"] = ANumber
-exports["AString"] = AString
+class MultipleGuess extends Answer
+  match_methods: ["exact", "exact_multiple", "include", "exclude"]
+
+  set_match_mode: (match_mode) ->
+    super(match_mode)
+    if @match == @match_exact
+      @answer = @original
+    else
+      @answer = new Set(@original)
+
+  constructor: (answer, match_mode="default", options={}) ->
+    @original = answer
+    @set_match_mode(match_mode)
+    @options = options
+
+  match_exact: (answer) -> @answer == answer
+  match_exact_multiple: (answer) -> @answer.equals(answer)
+  match_include: (answer) ->
+    if $.type(answer) == "string"
+      @answer.has(answer)
+    else
+      for a in answer
+        if not @answer.has(a)
+          return false
+      true
+
+  match_exclude: (answer) ->
+    if $.type(answer) == "string"
+      not @answer.has(answer)
+    else
+      for a in answer
+        if @answer.has(a)
+          return false
+      true

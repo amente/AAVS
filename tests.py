@@ -105,8 +105,8 @@ class MultipleGuessTest(unittest.TestCase):
     self.assertTrue(answer.match("0"))
     self.assertFalse(answer.match("1"))
 
-  def test_multiple_exact(self):
-    answer = MultipleGuess(["0", "1"], match_mode="multiple_exact")
+  def test_exact_multiple(self):
+    answer = MultipleGuess(["0", "1"], match_mode="exact_multiple")
     self.assertTrue(answer.match(["0", "1"]))
     self.assertFalse(answer.match(["0", "1", "2"]))
 
