@@ -124,7 +124,7 @@ class ANumber extends Answer
       range_checker = @range_checker[@options["rangemode"] or "inclusive"]
       range_checker(@low, @_interpret_input(answer), @high)
     else
-      Math.abs(@_interpret_input(answer) - @answer) < (@answer * 1e-11)
+      Math.abs(@_interpret_input(answer) - @answer) < (Math.abs(@answer) * 1e-10)
 
   match_sigfig: (answer) -> throw "NOT IMPLEMENTED!"
 

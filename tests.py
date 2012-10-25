@@ -22,6 +22,12 @@ class NumberTests(unittest.TestCase):
     self.assertFalse(answer.match("0/0")) # 0/0 is NaN
     self.assertTrue(answer.match("0.000000000001")) # unfortunately, due to rounding.
 
+    answer = Number("-18.292334140232416")
+    self.assertTrue(answer.match("-18.29"))
+    self.assertFalse(answer.match("18.29"))
+    self.assertFalse(answer.match("-18.28"))
+    self.assertFalse(answer.match("-18.295"))
+
     answer = Number(("1/2", "1"))
     self.assertTrue(answer.match("0.7"))
     self.assertFalse(answer.match("0.3"))
